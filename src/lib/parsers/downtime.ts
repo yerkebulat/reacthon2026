@@ -80,7 +80,7 @@ export function parseDowntime(buffer: Buffer): ParseResult<DowntimeDailyRecord> 
           lastDate = dateStr;
 
           // Save any pending records from previous date
-          for (const record of pendingRecords.values()) {
+          for (const record of Array.from(pendingRecords.values())) {
             if (record.reasonText || record.minutes) {
               downtimeData.push(record);
               rowsParsed++;
@@ -151,7 +151,7 @@ export function parseDowntime(buffer: Buffer): ParseResult<DowntimeDailyRecord> 
     }
 
     // Save remaining pending records
-    for (const record of pendingRecords.values()) {
+    for (const record of Array.from(pendingRecords.values())) {
       if (record.reasonText || record.minutes) {
         downtimeData.push(record);
         rowsParsed++;

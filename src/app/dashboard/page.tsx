@@ -155,12 +155,12 @@ export default function DashboardPage() {
   }, []);
 
   // Prepare chart data
-  const productivityChartData = data?.productivity.map((p) => ({
+  const productivityChartData = data?.productivity?.map((p) => ({
     date: p.date.split("-").slice(1).join("/"),
     productivity: p.avgPct.toFixed(1),
   })) || [];
 
-  const waterChartData = data?.water.map((w) => ({
+  const waterChartData = data?.water?.map((w) => ({
     date: w.date.split("-").slice(1).join("/"),
     actual: w.actual,
     nominal: w.nominal,
@@ -168,8 +168,8 @@ export default function DashboardPage() {
 
   // Aggregate downtime by equipment
   const downtimeByEquipment: Record<string, number> = {};
-  data?.downtime.forEach((d) => {
-    Object.entries(d.byEquipment).forEach(([eq, min]) => {
+  data?.downtime?.forEach((d) => {
+    Object.entries(d.byEquipment || {}).forEach(([eq, min]) => {
       downtimeByEquipment[eq] = (downtimeByEquipment[eq] || 0) + min;
     });
   });
@@ -180,8 +180,8 @@ export default function DashboardPage() {
 
   // Aggregate downtime by classification
   const downtimeByClass: Record<string, number> = {};
-  data?.downtime.forEach((d) => {
-    Object.entries(d.byClassification).forEach(([cls, min]) => {
+  data?.downtime?.forEach((d) => {
+    Object.entries(d.byClassification || {}).forEach(([cls, min]) => {
       downtimeByClass[cls] = (downtimeByClass[cls] || 0) + min;
     });
   });
@@ -192,8 +192,8 @@ export default function DashboardPage() {
 
   // Aggregate top downtime reasons
   const reasonMinutes: Record<string, number> = {};
-  data?.downtime.forEach((d) => {
-    d.reasons.forEach((r) => {
+  data?.downtime?.forEach((d) => {
+    (d.reasons || []).forEach((r) => {
       const shortReason = r.reason.substring(0, 50);
       reasonMinutes[shortReason] = (reasonMinutes[shortReason] || 0) + r.minutes;
     });
@@ -203,11 +203,11 @@ export default function DashboardPage() {
     .sort((a, b) => b.minutes - a.minutes)
     .slice(0, 5);
 
-  const totalDowntime = data?.downtime.reduce((sum, d) => sum + d.totalMinutes, 0) || 0;
-  const avgProductivity = data?.productivity.length
+  const totalDowntime = data?.downtime?.reduce((sum, d) => sum + d.totalMinutes, 0) || 0;
+  const avgProductivity = data?.productivity?.length
     ? data.productivity.reduce((sum, p) => sum + p.avgPct, 0) / data.productivity.length
     : 0;
-  const latestWater = data?.water[data.water.length - 1];
+  const latestWater = data?.water?.[data.water.length - 1];
   const waterOverNominal = latestWater && latestWater.nominal > 0
     ? ((latestWater.actual - latestWater.nominal) / latestWater.nominal * 100)
     : 0;
@@ -517,7 +517,7 @@ export default function DashboardPage() {
                 <CardTitle>Приоритетные задачи</CardTitle>
               </CardHeader>
               <CardContent>
-                {signals?.priorityItems.length ? (
+                {signals?.priorityItems?.length ? (
                   <div className="space-y-3">
                     {signals.priorityItems.slice(0, 5).map((item) => (
                       <div
