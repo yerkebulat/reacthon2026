@@ -43,7 +43,7 @@ export async function POST(request: NextRequest) {
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
-      body: `image=${encodeURIComponent(base64)}`,
+      body: base64,
     });
 
     if (!response.ok) {
