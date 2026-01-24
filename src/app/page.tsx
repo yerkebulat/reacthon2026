@@ -15,8 +15,8 @@ export default function HomePage() {
             <Image
               src="/logo_qazyna.png"
               alt="Qazyna Logo"
-              width={120}
-              height={120}
+              width={240}
+              height={240}
               className="rounded-lg"
             />
           </div>
