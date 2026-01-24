@@ -222,7 +222,8 @@ export default function DashboardPage() {
     .sort((a, b) => b.minutes - a.minutes)
     .slice(0, 5);
 
-  const totalDowntime = data?.downtime?.reduce((sum, d) => sum + d.totalMinutes, 0) || 0;
+  const totalDowntimeMinutes = data?.downtime?.reduce((sum, d) => sum + d.totalMinutes, 0) || 0;
+  const totalDowntimeHours = totalDowntimeMinutes / 60;
   const avgProductivity = data?.productivity?.length
     ? data.productivity.reduce((sum, p) => sum + p.avgPct, 0) / data.productivity.length
     : 0;
@@ -291,9 +292,9 @@ export default function DashboardPage() {
               color: signals?.downtime?.signal === "green" ? "#22c55e" :
                      signals?.downtime?.signal === "yellow" ? "#f59e0b" : "#ef4444"
             }}>
-              {totalDowntime.toFixed(2)}
+              {totalDowntimeHours.toFixed(2)}
             </div>
-            <div className="text-xl text-slate-300">Простой (мин)</div>
+            <div className="text-xl text-slate-300">Простой (ч)</div>
             <div className="text-sm text-slate-400 mt-2">За период</div>
           </div>
 
@@ -559,7 +560,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">
-                <div className="text-2xl font-bold">{totalDowntime.toFixed(2)} мин</div>
+                <div className="text-2xl font-bold">{totalDowntimeHours.toFixed(2)} ч</div>
                 {signals?.downtime && <SignalBadge signal={signals.downtime.signal} />}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
