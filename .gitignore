@@ -42,3 +42,4 @@ prisma/dev.db-journal
 # Uploads
 uploads/*
 !uploads/.gitkeep
+.env*.local
