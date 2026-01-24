@@ -273,7 +273,7 @@ export default function DashboardPage() {
             }}>
               {avgProductivity.toFixed(1)}%
             </div>
-            <div className="text-xl text-slate-300">Плотность</div>
+            <div className="text-lg text-slate-300 leading-snug break-words">Плотность</div>
             <div className="text-sm text-slate-400 mt-2">Цель: {signals?.productivity?.targetPct || 65}%</div>
           </div>
 
@@ -282,7 +282,7 @@ export default function DashboardPage() {
             <div className="text-6xl font-bold mb-2 text-emerald-400">
               {avgMillProductivityTph.toFixed(1)}
             </div>
-            <div className="text-xl text-slate-300">Производительность тн/ч</div>
+            <div className="text-lg text-slate-300 leading-snug break-words">Производительность тн/ч</div>
             <div className="text-sm text-slate-400 mt-2">Среднее за период</div>
           </div>
 
@@ -294,7 +294,7 @@ export default function DashboardPage() {
             }}>
               {totalDowntimeHours.toFixed(2)}
             </div>
-            <div className="text-xl text-slate-300">Простой (ч)</div>
+            <div className="text-lg text-slate-300 leading-snug break-words">Простой (ч)</div>
             <div className="text-sm text-slate-400 mt-2">За период</div>
           </div>
 
@@ -306,7 +306,7 @@ export default function DashboardPage() {
             }}>
               {waterOverNominal > 0 ? "+" : ""}{waterOverNominal.toFixed(1)}%
             </div>
-            <div className="text-xl text-slate-300">Расход воды</div>
+            <div className="text-lg text-slate-300 leading-snug break-words">Расход воды</div>
             <div className="text-sm text-slate-400 mt-2">От нормы</div>
           </div>
 
@@ -317,7 +317,7 @@ export default function DashboardPage() {
             }}>
               {data?.openHazards || 0}
             </div>
-            <div className="text-xl text-slate-300">Открытые риски</div>
+            <div className="text-lg text-slate-300 leading-snug break-words">Открытые риски</div>
             <div className="text-sm text-slate-400 mt-2">HSE инциденты</div>
           </div>
         </div>
@@ -419,9 +419,9 @@ export default function DashboardPage() {
             <h1 className="text-2xl font-bold">Панель управления</h1>
           </div>
           <div className="flex items-center gap-2">
-            <Button onClick={() => setPresentationMode(true)} variant="outline">
+            <Button onClick={() => setPresentationMode(true)} variant="outline" className="min-w-0 max-w-[150px] sm:max-w-none">
               <Presentation className="h-4 w-4 mr-2" />
-              Презентация
+              <span className="truncate">Презентация</span>
             </Button>
             <Button onClick={fetchData} disabled={loading}>
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
