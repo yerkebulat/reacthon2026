@@ -68,7 +68,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ detected: [], severity: null });
     }
 
-    const detectedClasses = Array.from(new Set(detected.map((d) => d.name)));
+    const detectedClasses = Array.from(
+      new Set(detected.map((d: { name: string; confidence: number }) => d.name))
+    );
 
     const severity = detectedClasses.reduce<keyof typeof SEVERITY_PRIORITY | null>(
       (acc, name) => {
