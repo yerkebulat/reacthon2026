@@ -8,6 +8,16 @@ import { detectHazardsFromText } from "../src/lib/hazard-detection";
 
 const prisma = new PrismaClient();
 
+async function createManyInChunks<T>(
+  items: T[],
+  chunkSize: number,
+  createMany: (data: T[]) => Promise<unknown>
+) {
+  for (let i = 0; i < items.length; i += chunkSize) {
+    await createMany(items.slice(i, i + chunkSize));
+  }
+}
+
 async function main() {
   console.log("Starting seed process...\n");
 
@@ -34,7 +44,7 @@ async function main() {
 
     for (const record of result.millProductivityTph.data) {
       millProductivityByShift.set(
-        `${record.date}-${record.shiftNumber}`,
+        `${record.date}|${record.shiftNumber}`,
         record.valueTph
       );
     }
@@ -55,84 +65,92 @@ async function main() {
       },
     });
 
-    // Store productivity data
-    let productivityCount = 0;
-    const shiftMap = new Map<string, string>();
-
+    // Upsert shifts once and cache ids
+    const shiftKeys = new Set<string>();
     for (const record of result.productivity.data) {
-      const shiftKey = `${record.date}-${record.shiftNumber}`;
-      let shiftId = shiftMap.get(shiftKey);
+      shiftKeys.add(`${record.date}|${record.shiftNumber}`);
+    }
+    for (const record of result.downtime.data) {
+      shiftKeys.add(`${record.date}|${record.shiftNumber}`);
+    }
+    for (const record of result.millProductivityTph.data) {
+      shiftKeys.add(`${record.date}|${record.shiftNumber}`);
+    }
+
+    const shiftMap = new Map<string, string>();
+    for (const shiftKey of Array.from(shiftKeys)) {
+      const [date, shiftNumberStr] = shiftKey.split("|");
+      const shiftNumber = parseInt(shiftNumberStr, 10);
       const millProductivityTph = millProductivityByShift.get(shiftKey);
-
-      if (!shiftId) {
-        const shift = await prisma.techJournalShift.upsert({
-          where: {
-            date_shiftNumber: {
-              date: new Date(record.date),
-              shiftNumber: record.shiftNumber,
-            },
+      const shift = await prisma.techJournalShift.upsert({
+        where: {
+          date_shiftNumber: {
+            date: new Date(date),
+            shiftNumber,
           },
-          update: {
-            sourceUploadId: upload.id,
-            ...(millProductivityTph !== undefined && { millProductivityTph }),
-          },
-          create: {
-            date: new Date(record.date),
-            shiftNumber: record.shiftNumber,
-            sourceUploadId: upload.id,
-            ...(millProductivityTph !== undefined && { millProductivityTph }),
-          },
-        });
-        shiftId = shift.id;
-        shiftMap.set(shiftKey, shiftId);
-      }
-
-      await prisma.techProductivity.create({
-        data: {
-          techShiftId: shiftId,
-          hour: record.hour,
-          millLine: record.millLine,
-          valuePct: record.valuePct,
+        },
+        update: {
+          sourceUploadId: upload.id,
+          ...(millProductivityTph !== undefined && { millProductivityTph }),
+        },
+        create: {
+          date: new Date(date),
+          shiftNumber,
+          sourceUploadId: upload.id,
+          ...(millProductivityTph !== undefined && { millProductivityTph }),
         },
       });
-      productivityCount++;
+      shiftMap.set(shiftKey, shift.id);
     }
+
+    // Store productivity data in batches
+    const productivityRows = result.productivity.data.map((record) => ({
+      techShiftId: shiftMap.get(`${record.date}|${record.shiftNumber}`)!,
+      hour: record.hour,
+      millLine: record.millLine,
+      valuePct: record.valuePct,
+    }));
+
+    await createManyInChunks(productivityRows, 1000, (data) =>
+      prisma.techProductivity.createMany({ data })
+    );
+    const productivityCount = productivityRows.length;
 
     // Store downtime data and detect hazards
     let downtimeCount = 0;
     let hazardCount = 0;
 
+    const downtimeWithHazards: Array<{
+      record: typeof result.downtime.data[number];
+      hazards: ReturnType<typeof detectHazardsFromText>;
+    }> = [];
+    const downtimeNoHazards = [];
+
     for (const record of result.downtime.data) {
-      const shiftKey = `${record.date}-${record.shiftNumber}`;
-      let shiftId = shiftMap.get(shiftKey);
-      const millProductivityTph = millProductivityByShift.get(shiftKey);
-
-      if (!shiftId) {
-        const shift = await prisma.techJournalShift.upsert({
-          where: {
-            date_shiftNumber: {
-              date: new Date(record.date),
-              shiftNumber: record.shiftNumber,
-            },
-          },
-          update: {
-            sourceUploadId: upload.id,
-            ...(millProductivityTph !== undefined && { millProductivityTph }),
-          },
-          create: {
-            date: new Date(record.date),
-            shiftNumber: record.shiftNumber,
-            sourceUploadId: upload.id,
-            ...(millProductivityTph !== undefined && { millProductivityTph }),
-          },
+      const hazards = record.reasonText ? detectHazardsFromText(record.reasonText) : [];
+      if (hazards.length > 0) {
+        downtimeWithHazards.push({ record, hazards });
+      } else {
+        downtimeNoHazards.push({
+          techShiftId: shiftMap.get(`${record.date}|${record.shiftNumber}`)!,
+          equipment: record.equipment,
+          timeFrom: record.timeFrom,
+          timeTo: record.timeTo,
+          minutes: record.minutes,
+          reasonText: record.reasonText,
         });
-        shiftId = shift.id;
-        shiftMap.set(shiftKey, shiftId);
       }
+    }
 
+    await createManyInChunks(downtimeNoHazards, 500, (data) =>
+      prisma.techDowntime.createMany({ data })
+    );
+    downtimeCount += downtimeNoHazards.length;
+
+    for (const { record, hazards } of downtimeWithHazards) {
       const downtime = await prisma.techDowntime.create({
         data: {
-          techShiftId: shiftId,
+          techShiftId: shiftMap.get(`${record.date}|${record.shiftNumber}`)!,
           equipment: record.equipment,
           timeFrom: record.timeFrom,
           timeTo: record.timeTo,
@@ -142,23 +160,17 @@ async function main() {
       });
       downtimeCount++;
 
-      // Detect hazards
-      if (record.reasonText) {
-        const hazards = detectHazardsFromText(record.reasonText);
-        for (const hazard of hazards) {
-          await prisma.hazard.create({
-            data: {
-              date: new Date(record.date),
-              sourceType: "tech_journal",
-              sourceRefId: downtime.id,
-              description: hazard.description,
-              severity: hazard.severity,
-              tags: hazard.matchedKeyword,
-            },
-          });
-          hazardCount++;
-        }
-      }
+      await prisma.hazard.createMany({
+        data: hazards.map((hazard) => ({
+          date: new Date(record.date),
+          sourceType: "tech_journal",
+          sourceRefId: downtime.id,
+          description: hazard.description,
+          severity: hazard.severity,
+          tags: hazard.matchedKeyword,
+        })),
+      });
+      hazardCount += hazards.length;
     }
 
     console.log(`  Productivity records: ${productivityCount}`);
@@ -186,30 +198,20 @@ async function main() {
       },
     });
 
-    let waterCount = 0;
-    for (const record of result.data) {
-      await prisma.waterDaily.upsert({
-        where: { date: new Date(record.date) },
-        update: {
-          meterReading: record.meterReading,
-          actualDaily: record.actualDaily,
-          actualHourly: record.actualHourly,
-          nominalDaily: record.nominalDaily,
-          monthLabel: record.monthLabel,
-          sourceUploadId: upload.id,
-        },
-        create: {
-          date: new Date(record.date),
-          meterReading: record.meterReading,
-          actualDaily: record.actualDaily,
-          actualHourly: record.actualHourly,
-          nominalDaily: record.nominalDaily,
-          monthLabel: record.monthLabel,
-          sourceUploadId: upload.id,
-        },
-      });
-      waterCount++;
-    }
+    const waterRows = result.data.map((record) => ({
+      date: new Date(record.date),
+      meterReading: record.meterReading,
+      actualDaily: record.actualDaily,
+      actualHourly: record.actualHourly,
+      nominalDaily: record.nominalDaily,
+      monthLabel: record.monthLabel,
+      sourceUploadId: upload.id,
+    }));
+
+    await createManyInChunks(waterRows, 500, (data) =>
+      prisma.waterDaily.createMany({ data })
+    );
+    const waterCount = waterRows.length;
 
     console.log(`  Water records: ${waterCount}`);
     console.log(`  Warnings: ${result.warnings.length}\n`);
@@ -236,8 +238,34 @@ async function main() {
 
     let downtimeCount = 0;
     let hazardCount = 0;
+    const downtimeWithHazards: Array<{
+      record: typeof result.data[number];
+      hazards: ReturnType<typeof detectHazardsFromText>;
+    }> = [];
+    const downtimeNoHazards = [];
 
     for (const record of result.data) {
+      const hazards = record.reasonText ? detectHazardsFromText(record.reasonText) : [];
+      if (hazards.length > 0) {
+        downtimeWithHazards.push({ record, hazards });
+      } else {
+        downtimeNoHazards.push({
+          date: new Date(record.date),
+          equipment: record.equipment,
+          reasonText: record.reasonText,
+          minutes: record.minutes,
+          classification: record.classification,
+          sourceUploadId: upload.id,
+        });
+      }
+    }
+
+    await createManyInChunks(downtimeNoHazards, 500, (data) =>
+      prisma.downtimeDaily.createMany({ data })
+    );
+    downtimeCount += downtimeNoHazards.length;
+
+    for (const { record, hazards } of downtimeWithHazards) {
       const downtime = await prisma.downtimeDaily.create({
         data: {
           date: new Date(record.date),
@@ -250,23 +278,17 @@ async function main() {
       });
       downtimeCount++;
 
-      // Detect hazards
-      if (record.reasonText) {
-        const hazards = detectHazardsFromText(record.reasonText);
-        for (const hazard of hazards) {
-          await prisma.hazard.create({
-            data: {
-              date: new Date(record.date),
-              sourceType: "downtime",
-              sourceRefId: downtime.id,
-              description: hazard.description,
-              severity: hazard.severity,
-              tags: hazard.matchedKeyword,
-            },
-          });
-          hazardCount++;
-        }
-      }
+      await prisma.hazard.createMany({
+        data: hazards.map((hazard) => ({
+          date: new Date(record.date),
+          sourceType: "downtime",
+          sourceRefId: downtime.id,
+          description: hazard.description,
+          severity: hazard.severity,
+          tags: hazard.matchedKeyword,
+        })),
+      });
+      hazardCount += hazards.length;
     }
 
     console.log(`  Downtime records: ${downtimeCount}`);

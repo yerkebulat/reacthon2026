@@ -6,6 +6,16 @@ import { parseWater } from '@/lib/parsers/water';
 import { parseDowntime } from '@/lib/parsers/downtime';
 import { detectHazardsFromText } from '@/lib/hazard-detection';
 
+async function createManyInChunks<T>(
+  items: T[],
+  chunkSize: number,
+  createMany: (data: T[]) => Promise<unknown>
+) {
+  for (let i = 0; i < items.length; i += chunkSize) {
+    await createMany(items.slice(i, i + chunkSize));
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData();
@@ -58,9 +68,20 @@ export async function POST(request: NextRequest) {
 
         for (const record of result.millProductivityTph.data) {
           millProductivityByShift.set(
-            `${record.date}-${record.shiftNumber}`,
+            `${record.date}|${record.shiftNumber}`,
             record.valueTph
           );
+        }
+
+        const shiftKeys = new Set<string>();
+        for (const record of result.productivity.data) {
+          shiftKeys.add(`${record.date}|${record.shiftNumber}`);
+        }
+        for (const record of result.downtime.data) {
+          shiftKeys.add(`${record.date}|${record.shiftNumber}`);
+        }
+        for (const record of result.millProductivityTph.data) {
+          shiftKeys.add(`${record.date}|${record.shiftNumber}`);
         }
 
         // Collect unique dates from the uploaded data
@@ -113,15 +134,17 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        // Store productivity data
-        for (const record of result.productivity.data) {
-          const shiftKey = `${record.date}-${record.shiftNumber}`;
+        // Upsert shifts once and cache ids
+        const shiftIdByKey = new Map<string, string>();
+        for (const shiftKey of Array.from(shiftKeys)) {
+          const [date, shiftNumberStr] = shiftKey.split('|');
+          const shiftNumber = parseInt(shiftNumberStr, 10);
           const millProductivityTph = millProductivityByShift.get(shiftKey);
           const shift = await prisma.techJournalShift.upsert({
             where: {
               date_shiftNumber: {
-                date: new Date(record.date),
-                shiftNumber: record.shiftNumber,
+                date: new Date(date),
+                shiftNumber,
               },
             },
             update: {
@@ -129,49 +152,58 @@ export async function POST(request: NextRequest) {
               ...(millProductivityTph !== undefined && { millProductivityTph }),
             },
             create: {
-              date: new Date(record.date),
-              shiftNumber: record.shiftNumber,
+              date: new Date(date),
+              shiftNumber,
               sourceUploadId: upload.id,
               ...(millProductivityTph !== undefined && { millProductivityTph }),
             },
           });
-
-          await prisma.techProductivity.create({
-            data: {
-              techShiftId: shift.id,
-              hour: record.hour,
-              millLine: record.millLine,
-              valuePct: record.valuePct,
-            },
-          });
+          shiftIdByKey.set(shiftKey, shift.id);
         }
 
-        // Store downtime data and detect hazards
-        for (const record of result.downtime.data) {
-          const shiftKey = `${record.date}-${record.shiftNumber}`;
-          const millProductivityTph = millProductivityByShift.get(shiftKey);
-          const shift = await prisma.techJournalShift.upsert({
-            where: {
-              date_shiftNumber: {
-                date: new Date(record.date),
-                shiftNumber: record.shiftNumber,
-              },
-            },
-            update: {
-              sourceUploadId: upload.id,
-              ...(millProductivityTph !== undefined && { millProductivityTph }),
-            },
-            create: {
-              date: new Date(record.date),
-              shiftNumber: record.shiftNumber,
-              sourceUploadId: upload.id,
-              ...(millProductivityTph !== undefined && { millProductivityTph }),
-            },
-          });
+        // Store productivity data in batches
+        const productivityRows = result.productivity.data.map((record) => ({
+          techShiftId: shiftIdByKey.get(`${record.date}|${record.shiftNumber}`)!,
+          hour: record.hour,
+          millLine: record.millLine,
+          valuePct: record.valuePct,
+        }));
 
+        await createManyInChunks(productivityRows, 1000, (data) =>
+          prisma.techProductivity.createMany({ data })
+        );
+
+        // Store downtime data and detect hazards
+        const downtimeWithHazards: Array<{
+          record: typeof result.downtime.data[number];
+          hazards: ReturnType<typeof detectHazardsFromText>;
+        }> = [];
+        const downtimeNoHazards = [];
+
+        for (const record of result.downtime.data) {
+          const hazards = record.reasonText ? detectHazardsFromText(record.reasonText) : [];
+          if (hazards.length > 0) {
+            downtimeWithHazards.push({ record, hazards });
+          } else {
+            downtimeNoHazards.push({
+              techShiftId: shiftIdByKey.get(`${record.date}|${record.shiftNumber}`)!,
+              equipment: record.equipment,
+              timeFrom: record.timeFrom,
+              timeTo: record.timeTo,
+              minutes: record.minutes,
+              reasonText: record.reasonText,
+            });
+          }
+        }
+
+        await createManyInChunks(downtimeNoHazards, 500, (data) =>
+          prisma.techDowntime.createMany({ data })
+        );
+
+        for (const { record, hazards } of downtimeWithHazards) {
           const downtime = await prisma.techDowntime.create({
             data: {
-              techShiftId: shift.id,
+              techShiftId: shiftIdByKey.get(`${record.date}|${record.shiftNumber}`)!,
               equipment: record.equipment,
               timeFrom: record.timeFrom,
               timeTo: record.timeTo,
@@ -180,22 +212,16 @@ export async function POST(request: NextRequest) {
             },
           });
 
-          // Detect hazards from reason text
-          if (record.reasonText) {
-            const hazards = detectHazardsFromText(record.reasonText);
-            for (const hazard of hazards) {
-              await prisma.hazard.create({
-                data: {
-                  date: new Date(record.date),
-                  sourceType: 'tech_journal',
-                  sourceRefId: downtime.id,
-                  description: hazard.description,
-                  severity: hazard.severity,
-                  tags: hazard.matchedKeyword,
-                },
-              });
-            }
-          }
+          await prisma.hazard.createMany({
+            data: hazards.map((hazard) => ({
+              date: new Date(record.date),
+              sourceType: 'tech_journal',
+              sourceRefId: downtime.id,
+              description: hazard.description,
+              severity: hazard.severity,
+              tags: hazard.matchedKeyword,
+            })),
+          });
         }
 
         rowsParsed =
@@ -271,7 +297,33 @@ export async function POST(request: NextRequest) {
           });
         }
 
+        const downtimeWithHazards: Array<{
+          record: typeof result.data[number];
+          hazards: ReturnType<typeof detectHazardsFromText>;
+        }> = [];
+        const downtimeNoHazards = [];
+
         for (const record of result.data) {
+          const hazards = record.reasonText ? detectHazardsFromText(record.reasonText) : [];
+          if (hazards.length > 0) {
+            downtimeWithHazards.push({ record, hazards });
+          } else {
+            downtimeNoHazards.push({
+              date: new Date(record.date),
+              equipment: record.equipment,
+              reasonText: record.reasonText,
+              minutes: record.minutes,
+              classification: record.classification,
+              sourceUploadId: upload.id,
+            });
+          }
+        }
+
+        await createManyInChunks(downtimeNoHazards, 500, (data) =>
+          prisma.downtimeDaily.createMany({ data })
+        );
+
+        for (const { record, hazards } of downtimeWithHazards) {
           const downtime = await prisma.downtimeDaily.create({
             data: {
               date: new Date(record.date),
@@ -283,22 +335,16 @@ export async function POST(request: NextRequest) {
             },
           });
 
-          // Detect hazards from reason text
-          if (record.reasonText) {
-            const hazards = detectHazardsFromText(record.reasonText);
-            for (const hazard of hazards) {
-              await prisma.hazard.create({
-                data: {
-                  date: new Date(record.date),
-                  sourceType: 'downtime',
-                  sourceRefId: downtime.id,
-                  description: hazard.description,
-                  severity: hazard.severity,
-                  tags: hazard.matchedKeyword,
-                },
-              });
-            }
-          }
+          await prisma.hazard.createMany({
+            data: hazards.map((hazard) => ({
+              date: new Date(record.date),
+              sourceType: 'downtime',
+              sourceRefId: downtime.id,
+              description: hazard.description,
+              severity: hazard.severity,
+              tags: hazard.matchedKeyword,
+            })),
+          });
         }
 
         rowsParsed = result.rowsParsed;
