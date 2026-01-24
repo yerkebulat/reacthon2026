@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, RefreshCw, Calendar } from "lucide-react";
+import { ArrowLeft, RefreshCw, Calendar, Presentation, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -118,6 +118,18 @@ export default function DashboardPage() {
   const [toDate, setToDate] = useState("");
   const [shift, setShift] = useState("all");
   const [activePreset, setActivePreset] = useState<DatePreset>("all");
+  const [presentationMode, setPresentationMode] = useState(false);
+
+  // ESC key to exit presentation mode
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && presentationMode) {
+        setPresentationMode(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [presentationMode]);
 
   const fetchData = async () => {
     setLoading(true);
@@ -213,6 +225,140 @@ export default function DashboardPage() {
     ? ((latestWater.actual - latestWater.nominal) / latestWater.nominal * 100)
     : 0;
 
+  // Presentation Mode View
+  if (presentationMode) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 text-white p-8">
+        {/* Close button */}
+        <button
+          onClick={() => setPresentationMode(false)}
+          className="absolute top-4 right-4 p-2 hover:bg-white/10 rounded-full transition-colors"
+        >
+          <X className="h-6 w-6" />
+        </button>
+
+        {/* Logo and Title */}
+        <div className="text-center mb-12">
+          <div className="flex justify-center mb-4">
+            <Image src="/logo_qazyna.png" alt="Qazyna" width={100} height={100} className="rounded-lg" />
+          </div>
+          <h1 className="text-4xl font-bold mb-2">Qazyna Dashboard</h1>
+          <p className="text-slate-400">
+            {new Date().toLocaleDateString("ru-RU", {
+              weekday: "long",
+              year: "numeric",
+              month: "long",
+              day: "numeric"
+            })}
+          </p>
+        </div>
+
+        {/* Main KPIs */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto mb-12">
+          {/* Productivity */}
+          <div className="bg-white/10 backdrop-blur rounded-2xl p-8 text-center">
+            <div className="text-6xl font-bold mb-2" style={{
+              color: signals?.productivity?.signal === "green" ? "#22c55e" :
+                     signals?.productivity?.signal === "yellow" ? "#f59e0b" : "#ef4444"
+            }}>
+              {avgProductivity.toFixed(1)}%
+            </div>
+            <div className="text-xl text-slate-300">Производительность</div>
+            <div className="text-sm text-slate-400 mt-2">Цель: {signals?.productivity?.targetPct || 65}%</div>
+          </div>
+
+          {/* Downtime */}
+          <div className="bg-white/10 backdrop-blur rounded-2xl p-8 text-center">
+            <div className="text-6xl font-bold mb-2" style={{
+              color: signals?.downtime?.signal === "green" ? "#22c55e" :
+                     signals?.downtime?.signal === "yellow" ? "#f59e0b" : "#ef4444"
+            }}>
+              {totalDowntime}
+            </div>
+            <div className="text-xl text-slate-300">Простой (мин)</div>
+            <div className="text-sm text-slate-400 mt-2">За период</div>
+          </div>
+
+          {/* Water */}
+          <div className="bg-white/10 backdrop-blur rounded-2xl p-8 text-center">
+            <div className="text-6xl font-bold mb-2" style={{
+              color: signals?.water?.signal === "green" ? "#22c55e" :
+                     signals?.water?.signal === "yellow" ? "#f59e0b" : "#ef4444"
+            }}>
+              {waterOverNominal > 0 ? "+" : ""}{waterOverNominal.toFixed(1)}%
+            </div>
+            <div className="text-xl text-slate-300">Расход воды</div>
+            <div className="text-sm text-slate-400 mt-2">От нормы</div>
+          </div>
+
+          {/* HSE */}
+          <div className="bg-white/10 backdrop-blur rounded-2xl p-8 text-center">
+            <div className="text-6xl font-bold mb-2" style={{
+              color: (data?.openHazards || 0) === 0 ? "#22c55e" : "#ef4444"
+            }}>
+              {data?.openHazards || 0}
+            </div>
+            <div className="text-xl text-slate-300">Открытые риски</div>
+            <div className="text-sm text-slate-400 mt-2">HSE инциденты</div>
+          </div>
+        </div>
+
+        {/* Charts Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
+          {/* Productivity Chart */}
+          <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
+            <h3 className="text-xl font-semibold mb-4 text-center">Производительность</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={productivityChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
+                  <XAxis dataKey="date" stroke="#94a3b8" />
+                  <YAxis domain={[0, 100]} stroke="#94a3b8" />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: "#1e293b", border: "none", borderRadius: "8px" }}
+                    labelStyle={{ color: "#94a3b8" }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="productivity"
+                    name="Плотность %"
+                    stroke="#3b82f6"
+                    strokeWidth={3}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Downtime by Equipment */}
+          <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
+            <h3 className="text-xl font-semibold mb-4 text-center">Простой по оборудованию</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={downtimeEquipmentData} layout="vertical">
+                  <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
+                  <XAxis type="number" stroke="#94a3b8" />
+                  <YAxis dataKey="name" type="category" width={80} stroke="#94a3b8" />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: "#1e293b", border: "none", borderRadius: "8px" }}
+                    labelStyle={{ color: "#94a3b8" }}
+                  />
+                  <Bar dataKey="minutes" name="Минуты" fill="#3b82f6" radius={[0, 4, 4, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="text-center mt-8 text-slate-500 text-sm">
+          Нажмите ESC или ✕ для выхода из режима презентации
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Header */}
@@ -227,10 +373,16 @@ export default function DashboardPage() {
             <Image src="/logo_qazyna.png" alt="Qazyna" width={40} height={40} className="rounded" />
             <h1 className="text-2xl font-bold">Панель управления</h1>
           </div>
-          <Button onClick={fetchData} disabled={loading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-            Обновить
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button onClick={() => setPresentationMode(true)} variant="outline">
+              <Presentation className="h-4 w-4 mr-2" />
+              Презентация
+            </Button>
+            <Button onClick={fetchData} disabled={loading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+              Обновить
+            </Button>
+          </div>
         </div>
       </header>
 

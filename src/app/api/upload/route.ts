@@ -329,7 +329,23 @@ export async function GET() {
       take: 20,
     });
 
-    return NextResponse.json(uploads);
+    // Get last successful upload for each type
+    const lastUploads = await Promise.all(
+      ['tech_journal', 'water', 'downtime'].map(async (type) => {
+        const last = await prisma.upload.findFirst({
+          where: { type, status: 'completed' },
+          orderBy: { uploadedAt: 'desc' },
+        });
+        return { type, lastUpload: last };
+      })
+    );
+
+    const lastUploadByType = lastUploads.reduce(
+      (acc, { type, lastUpload }) => ({ ...acc, [type]: lastUpload }),
+      {} as Record<string, typeof lastUploads[0]['lastUpload']>
+    );
+
+    return NextResponse.json({ uploads, lastUploadByType });
   } catch (error) {
     console.error('Get uploads error:', error);
     return NextResponse.json(

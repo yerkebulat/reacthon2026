@@ -1,13 +1,20 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ArrowLeft, Upload, FileSpreadsheet, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { ArrowLeft, Upload, FileSpreadsheet, CheckCircle, XCircle, Loader2, Clock } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+
+interface LastUploadInfo {
+  id: string;
+  uploadedAt: string;
+  filename: string;
+  rowsParsed: number;
+}
 
 interface UploadResult {
   success: boolean;
@@ -51,11 +58,13 @@ const FILE_TYPES = [
 function FileUploadBlock({
   type,
   state,
+  lastUpload,
   onFileSelect,
   onUpload,
 }: {
   type: (typeof FILE_TYPES)[0];
   state: FileUploadState;
+  lastUpload: LastUploadInfo | null;
   onFileSelect: (file: File) => void;
   onUpload: () => void;
 }) {
@@ -100,6 +109,21 @@ function FileUploadBlock({
           {type.title}
         </CardTitle>
         <CardDescription>{type.description}</CardDescription>
+        {lastUpload && (
+          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2 pt-2 border-t">
+            <Clock className="h-3 w-3" />
+            <span>
+              Последняя загрузка: {new Date(lastUpload.uploadedAt).toLocaleDateString("ru-RU", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </span>
+            <span className="text-green-600">({lastUpload.rowsParsed} строк)</span>
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         <div
@@ -203,6 +227,23 @@ export default function UploadPage() {
       {}
     )
   );
+  const [lastUploads, setLastUploads] = useState<Record<string, LastUploadInfo | null>>({});
+
+  // Fetch last upload info on mount
+  useEffect(() => {
+    const fetchLastUploads = async () => {
+      try {
+        const response = await fetch("/api/upload");
+        const data = await response.json();
+        if (data.lastUploadByType) {
+          setLastUploads(data.lastUploadByType);
+        }
+      } catch (error) {
+        console.error("Failed to fetch last uploads:", error);
+      }
+    };
+    fetchLastUploads();
+  }, []);
 
   const handleFileSelect = (typeId: string, file: File) => {
     setUploadStates((prev) => ({
@@ -311,6 +352,7 @@ export default function UploadPage() {
                 key={type.id}
                 type={type}
                 state={uploadStates[type.id]}
+                lastUpload={lastUploads[type.id] || null}
                 onFileSelect={(file) => handleFileSelect(type.id, file)}
                 onUpload={() => handleUpload(type.id)}
               />
