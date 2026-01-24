@@ -166,7 +166,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   // Prepare chart data
   const productivityChartData = data?.productivity?.map((p) => ({

@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
 
     const detectedClasses = Array.from(
       new Set(detected.map((d: { name: string; confidence: number }) => d.name))
-    );
+    ) as string[];
 
     const severity = detectedClasses.reduce<keyof typeof SEVERITY_PRIORITY | null>(
       (acc, name) => {
