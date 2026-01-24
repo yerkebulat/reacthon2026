@@ -29,17 +29,23 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Save file to Vercel Blob
+    // Get file buffer
     const buffer = Buffer.from(await file.arrayBuffer());
-    const blob = await put(`uploads/${upload.id}-${file.name}`, buffer, {
-      access: 'public',
-    });
 
-    // Update upload with blob URL
-    await prisma.upload.update({
-      where: { id: upload.id },
-      data: { fileUrl: blob.url },
-    });
+    // Save file to Vercel Blob (optional - skip if token not configured)
+    try {
+      if (process.env.BLOB_READ_WRITE_TOKEN) {
+        const blob = await put(`uploads/${upload.id}-${file.name}`, buffer, {
+          access: 'public',
+        });
+        await prisma.upload.update({
+          where: { id: upload.id },
+          data: { fileUrl: blob.url },
+        });
+      }
+    } catch (blobError) {
+      console.warn('Blob upload failed, continuing without file storage:', blobError);
+    }
 
     let rowsParsed = 0;
     let warningsCount = 0;
