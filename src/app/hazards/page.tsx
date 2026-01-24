@@ -85,6 +85,14 @@ export default function HazardsPage() {
   const [data, setData] = useState<HazardsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
+  const [detecting, setDetecting] = useState(false);
+  const [detectResult, setDetectResult] = useState<{
+    severity: string | null;
+    detected: string[];
+    confidence?: number;
+  } | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [confidence, setConfidence] = useState("0.4");
   const [newHazard, setNewHazard] = useState({
     date: new Date().toISOString().split("T")[0],
     description: "",
@@ -119,6 +127,8 @@ export default function HazardsPage() {
 
       if (response.ok) {
         setShowAddDialog(false);
+        setDetectResult(null);
+        setPhotoFile(null);
         setNewHazard({
           date: new Date().toISOString().split("T")[0],
           description: "",
@@ -129,6 +139,50 @@ export default function HazardsPage() {
       }
     } catch (error) {
       console.error("Failed to add hazard:", error);
+    }
+  };
+
+  const handlePhotoDetect = async () => {
+    if (!photoFile) return;
+    setDetecting(true);
+    setDetectResult(null);
+    try {
+      const formData = new FormData();
+      formData.append("file", photoFile);
+      formData.append("confidence", confidence);
+
+      const response = await fetch("/api/hazards/detect", {
+        method: "POST",
+        body: formData,
+      });
+
+      const result = await response.json();
+      if (response.ok) {
+        setDetectResult(result);
+        if (result.severity) {
+          setNewHazard((prev) => ({
+            ...prev,
+            severity: result.severity,
+            tags: result.detected?.join(", ") || prev.tags,
+            description: result.detected?.length
+              ? `${prev.description ? `${prev.description}\n` : ""}Авто-детекция: ${result.detected.join(", ")}`
+              : prev.description,
+          }));
+        }
+      } else {
+        setDetectResult({
+          severity: null,
+          detected: [],
+        });
+      }
+    } catch (error) {
+      console.error("Failed to detect hazards:", error);
+      setDetectResult({
+        severity: null,
+        detected: [],
+      });
+    } finally {
+      setDetecting(false);
     }
   };
 
@@ -196,6 +250,50 @@ export default function HazardsPage() {
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="photo">Фото инцидента (не сохраняется)</Label>
+                    <Input
+                      id="photo"
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        setPhotoFile(e.target.files?.[0] || null);
+                        setDetectResult(null);
+                      }}
+                    />
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="confidence" className="text-sm text-muted-foreground">
+                        Порог уверенности
+                      </Label>
+                      <Input
+                        id="confidence"
+                        type="number"
+                        min="0.1"
+                        max="1"
+                        step="0.05"
+                        value={confidence}
+                        onChange={(e) => setConfidence(e.target.value)}
+                        className="w-24"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handlePhotoDetect}
+                        disabled={!photoFile || detecting}
+                      >
+                        {detecting ? "Анализ..." : "Анализировать фото"}
+                      </Button>
+                      {detectResult && (
+                        <span className="text-sm text-muted-foreground">
+                          {detectResult.detected.length
+                            ? `Обнаружено: ${detectResult.detected.join(", ")}`
+                            : "Объекты не найдены"}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                   <div className="space-y-2">
                     <Label htmlFor="date">Дата</Label>
                     <Input
