@@ -226,6 +226,9 @@ export default function DashboardPage() {
   const avgProductivity = data?.productivity?.length
     ? data.productivity.reduce((sum, p) => sum + p.avgPct, 0) / data.productivity.length
     : 0;
+  const avgMillProductivityTph = data?.millProductivityTph?.length
+    ? data.millProductivityTph.reduce((sum, p) => sum + p.avgTph, 0) / data.millProductivityTph.length
+    : 0;
   const latestWater = data?.water?.[data.water.length - 1];
   const waterOverNominal = latestWater && latestWater.nominal > 0
     ? ((latestWater.actual - latestWater.nominal) / latestWater.nominal * 100)
@@ -260,8 +263,8 @@ export default function DashboardPage() {
         </div>
 
         {/* Main KPIs */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto mb-12">
-          {/* Productivity */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-8 max-w-6xl mx-auto mb-12">
+          {/* Density */}
           <div className="bg-white/10 backdrop-blur rounded-2xl p-8 text-center">
             <div className="text-6xl font-bold mb-2" style={{
               color: signals?.productivity?.signal === "green" ? "#22c55e" :
@@ -269,8 +272,17 @@ export default function DashboardPage() {
             }}>
               {avgProductivity.toFixed(1)}%
             </div>
-            <div className="text-xl text-slate-300">Производительность</div>
+            <div className="text-xl text-slate-300">Плотность</div>
             <div className="text-sm text-slate-400 mt-2">Цель: {signals?.productivity?.targetPct || 65}%</div>
+          </div>
+
+          {/* Mill Productivity TPH */}
+          <div className="bg-white/10 backdrop-blur rounded-2xl p-8 text-center">
+            <div className="text-6xl font-bold mb-2 text-emerald-400">
+              {avgMillProductivityTph.toFixed(1)}
+            </div>
+            <div className="text-xl text-slate-300">Производительность тн/ч</div>
+            <div className="text-sm text-slate-400 mt-2">Среднее за период</div>
           </div>
 
           {/* Downtime */}
@@ -313,7 +325,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {/* Productivity Chart */}
           <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
-            <h3 className="text-xl font-semibold mb-4 text-center">Производительность</h3>
+            <h3 className="text-xl font-semibold mb-4 text-center">Плотность</h3>
             <div className="h-64">
               <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={productivityChartData}>
@@ -505,11 +517,11 @@ export default function DashboardPage() {
 
       <div className="p-6">
         {/* KPI Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
           <Card>
             <CardHeader className="pb-2">
               <CardTitle className="text-sm font-medium text-muted-foreground">
-                Производительность
+                Плотность
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -519,6 +531,22 @@ export default function DashboardPage() {
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Цель: {signals?.productivity?.targetPct || 65}%
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-medium text-muted-foreground">
+                Производительность тн/ч
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex items-center justify-between">
+                <div className="text-2xl font-bold">{avgMillProductivityTph.toFixed(1)}</div>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Среднее за период
               </p>
             </CardContent>
           </Card>
@@ -743,7 +771,7 @@ export default function DashboardPage() {
                       >
                         <div className="flex items-center justify-between mb-1">
                           <Badge variant={item.signal === "red" ? "danger" : item.signal === "yellow" ? "warning" : "success"}>
-                            {item.type === "downtime" ? "Простой" : item.type === "water" ? "Вода" : "Производительность"}
+                            {item.type === "downtime" ? "Простой" : item.type === "water" ? "Вода" : "Плотность"}
                           </Badge>
                           <span className="text-sm text-muted-foreground">{item.date}</span>
                         </div>
