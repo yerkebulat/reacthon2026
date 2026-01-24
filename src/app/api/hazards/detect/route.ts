@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
         name: String(p.class || "").toLowerCase(),
         confidence: typeof p.confidence === "number" ? p.confidence : 0,
       }))
-      .filter((p) => p.name && p.confidence >= confidence);
+      .filter((p: { name: string; confidence: number }) => p.name && p.confidence >= confidence);
 
     if (detected.length === 0) {
       return NextResponse.json({ detected: [], severity: null });
