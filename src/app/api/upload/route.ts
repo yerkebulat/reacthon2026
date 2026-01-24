@@ -269,30 +269,31 @@ export async function POST(request: NextRequest) {
           uniqueDates.add(new Date(record.date).toISOString().split('T')[0]);
         }
 
-        // Delete old records for overlapping dates
-        for (const dateStr of Array.from(uniqueDates)) {
-          const startOfDay = new Date(dateStr);
-          const endOfDay = new Date(dateStr);
-          endOfDay.setDate(endOfDay.getDate() + 1);
+        if (uniqueDates.size > 0) {
+          const dateRanges = Array.from(uniqueDates).map((dateStr) => {
+            const startOfDay = new Date(dateStr);
+            const endOfDay = new Date(dateStr);
+            endOfDay.setDate(endOfDay.getDate() + 1);
+            return {
+              date: {
+                gte: startOfDay,
+                lt: endOfDay,
+              },
+            };
+          });
 
           // Delete related hazards first
           await prisma.hazard.deleteMany({
             where: {
               sourceType: 'downtime',
-              date: {
-                gte: startOfDay,
-                lt: endOfDay,
-              },
+              OR: dateRanges,
             },
           });
 
           // Delete old downtime records
           await prisma.downtimeDaily.deleteMany({
             where: {
-              date: {
-                gte: startOfDay,
-                lt: endOfDay,
-              },
+              OR: dateRanges,
             },
           });
         }
