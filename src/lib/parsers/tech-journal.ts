@@ -18,6 +18,12 @@ export interface TechProductivityRecord {
   valuePct: number | null;
 }
 
+export interface TechMillProductivityRecord {
+  date: string;
+  shiftNumber: number;
+  valueTph: number | null;
+}
+
 export interface TechDowntimeRecord {
   date: string;
   shiftNumber: number;
@@ -30,6 +36,7 @@ export interface TechDowntimeRecord {
 
 export interface TechJournalParseResult {
   productivity: ParseResult<TechProductivityRecord>;
+  millProductivityTph: ParseResult<TechMillProductivityRecord>;
   downtime: ParseResult<TechDowntimeRecord>;
 }
 
@@ -37,11 +44,14 @@ export function parseTechJournal(buffer: Buffer): TechJournalParseResult {
   const workbook = XLSX.read(buffer, { type: 'buffer' });
 
   const productivityData: TechProductivityRecord[] = [];
+  const millProductivityData: TechMillProductivityRecord[] = [];
   const downtimeData: TechDowntimeRecord[] = [];
   const productivityWarnings: ParseWarning[] = [];
+  const millProductivityWarnings: ParseWarning[] = [];
   const downtimeWarnings: ParseWarning[] = [];
 
   let productivityRowsParsed = 0;
+  let millProductivityRowsParsed = 0;
   let downtimeRowsParsed = 0;
 
   for (const sheetName of workbook.SheetNames) {
@@ -55,6 +65,26 @@ export function parseTechJournal(buffer: Buffer): TechJournalParseResult {
     const data = XLSX.utils.sheet_to_json<unknown[]>(sheet, { header: 1, defval: '' });
 
     const dateStr = toISODateString(date);
+
+    // Parse mill productivity (cell U17) - all mills total throughput (тн/ч)
+    const throughputCell = sheet['U17'];
+    const throughputValue = parseNumeric(throughputCell?.v ?? throughputCell);
+    if (throughputCell && throughputValue === null) {
+      millProductivityWarnings.push({
+        sheet: sheetName,
+        row: 17,
+        column: 21,
+        message: `Invalid mill productivity value: ${throughputCell?.v ?? ''}`,
+      });
+    }
+    if (throughputCell || throughputValue !== null) {
+      millProductivityData.push({
+        date: dateStr,
+        shiftNumber,
+        valueTph: throughputValue,
+      });
+      millProductivityRowsParsed++;
+    }
 
     // Parse productivity data (rows 4-16, columns B-F for mills 1-5)
     // Hours are in column A
@@ -225,6 +255,11 @@ export function parseTechJournal(buffer: Buffer): TechJournalParseResult {
       data: productivityData,
       warnings: productivityWarnings,
       rowsParsed: productivityRowsParsed,
+    },
+    millProductivityTph: {
+      data: millProductivityData,
+      warnings: millProductivityWarnings,
+      rowsParsed: millProductivityRowsParsed,
     },
     downtime: {
       data: downtimeData,

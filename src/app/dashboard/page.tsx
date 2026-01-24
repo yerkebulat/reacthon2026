@@ -28,6 +28,7 @@ import {
 
 interface DashboardData {
   productivity: Array<{ date: string; avgPct: number; byHour: Array<{ hour: number; avgPct: number }> }>;
+  millProductivityTph: Array<{ date: string; avgTph: number }>;
   downtime: Array<{
     date: string;
     totalMinutes: number;
@@ -173,6 +174,11 @@ export default function DashboardPage() {
     productivity: p.avgPct.toFixed(1),
   })) || [];
 
+  const millProductivityChartData = data?.millProductivityTph?.map((p) => ({
+    date: p.date.split("-").slice(1).join("/"),
+    throughput: p.avgTph.toFixed(1),
+  })) || [];
+
   const waterChartData = data?.water?.map((w) => ({
     date: w.date.split("-").slice(1).join("/"),
     actual: w.actual,
@@ -304,7 +310,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Charts Row */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 max-w-6xl mx-auto">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {/* Productivity Chart */}
           <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
             <h3 className="text-xl font-semibold mb-4 text-center">Производительность</h3>
@@ -323,6 +329,32 @@ export default function DashboardPage() {
                     dataKey="productivity"
                     name="Плотность %"
                     stroke="#3b82f6"
+                    strokeWidth={3}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Mill Productivity TPH Chart */}
+          <div className="bg-white/10 backdrop-blur rounded-2xl p-6">
+            <h3 className="text-xl font-semibold mb-4 text-center">Производительность мельниц тн/ч</h3>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={millProductivityChartData}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#475569" />
+                  <XAxis dataKey="date" stroke="#94a3b8" />
+                  <YAxis stroke="#94a3b8" />
+                  <Tooltip
+                    contentStyle={{ backgroundColor: "#1e293b", border: "none", borderRadius: "8px" }}
+                    labelStyle={{ color: "#94a3b8" }}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="throughput"
+                    name="тн/ч"
+                    stroke="#10b981"
                     strokeWidth={3}
                     dot={false}
                   />
@@ -553,7 +585,7 @@ export default function DashboardPage() {
             {/* Productivity Chart */}
             <Card>
               <CardHeader>
-                <CardTitle>Производительность мельниц</CardTitle>
+              <CardTitle>Плотность</CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="h-64">
@@ -569,6 +601,33 @@ export default function DashboardPage() {
                         dataKey="productivity"
                         name="Плотность %"
                         stroke="#3b82f6"
+                        strokeWidth={2}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Mill Productivity TPH Chart */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Производительность мельниц тн/ч</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="h-64">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={millProductivityChartData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" />
+                      <YAxis />
+                      <Tooltip />
+                      <Legend />
+                      <Line
+                        type="monotone"
+                        dataKey="throughput"
+                        name="тн/ч"
+                        stroke="#10b981"
                         strokeWidth={2}
                       />
                     </LineChart>

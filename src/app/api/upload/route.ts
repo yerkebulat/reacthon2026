@@ -54,6 +54,14 @@ export async function POST(request: NextRequest) {
     try {
       if (fileType === 'tech_journal') {
         const result = parseTechJournal(buffer);
+        const millProductivityByShift = new Map<string, number | null>();
+
+        for (const record of result.millProductivityTph.data) {
+          millProductivityByShift.set(
+            `${record.date}-${record.shiftNumber}`,
+            record.valueTph
+          );
+        }
 
         // Collect unique dates from the uploaded data
         const uniqueDates = new Set<string>();
@@ -107,6 +115,8 @@ export async function POST(request: NextRequest) {
 
         // Store productivity data
         for (const record of result.productivity.data) {
+          const shiftKey = `${record.date}-${record.shiftNumber}`;
+          const millProductivityTph = millProductivityByShift.get(shiftKey);
           const shift = await prisma.techJournalShift.upsert({
             where: {
               date_shiftNumber: {
@@ -114,11 +124,15 @@ export async function POST(request: NextRequest) {
                 shiftNumber: record.shiftNumber,
               },
             },
-            update: { sourceUploadId: upload.id },
+            update: {
+              sourceUploadId: upload.id,
+              ...(millProductivityTph !== undefined && { millProductivityTph }),
+            },
             create: {
               date: new Date(record.date),
               shiftNumber: record.shiftNumber,
               sourceUploadId: upload.id,
+              ...(millProductivityTph !== undefined && { millProductivityTph }),
             },
           });
 
@@ -134,6 +148,8 @@ export async function POST(request: NextRequest) {
 
         // Store downtime data and detect hazards
         for (const record of result.downtime.data) {
+          const shiftKey = `${record.date}-${record.shiftNumber}`;
+          const millProductivityTph = millProductivityByShift.get(shiftKey);
           const shift = await prisma.techJournalShift.upsert({
             where: {
               date_shiftNumber: {
@@ -141,11 +157,15 @@ export async function POST(request: NextRequest) {
                 shiftNumber: record.shiftNumber,
               },
             },
-            update: { sourceUploadId: upload.id },
+            update: {
+              sourceUploadId: upload.id,
+              ...(millProductivityTph !== undefined && { millProductivityTph }),
+            },
             create: {
               date: new Date(record.date),
               shiftNumber: record.shiftNumber,
               sourceUploadId: upload.id,
+              ...(millProductivityTph !== undefined && { millProductivityTph }),
             },
           });
 
@@ -178,9 +198,14 @@ export async function POST(request: NextRequest) {
           }
         }
 
-        rowsParsed = result.productivity.rowsParsed + result.downtime.rowsParsed;
+        rowsParsed =
+          result.productivity.rowsParsed +
+          result.millProductivityTph.rowsParsed +
+          result.downtime.rowsParsed;
         warningsCount =
-          result.productivity.warnings.length + result.downtime.warnings.length;
+          result.productivity.warnings.length +
+          result.millProductivityTph.warnings.length +
+          result.downtime.warnings.length;
       } else if (fileType === 'water') {
         const result = parseWater(buffer);
 

@@ -66,6 +66,24 @@ export async function GET(request: NextRequest) {
         .sort((a, b) => a.hour - b.hour),
     }));
 
+    // Aggregate mill productivity (тн/ч) by date
+    const millProductivityByDate = new Map<string, { date: string; values: number[] }>();
+    for (const shiftData of productivityData) {
+      const dateStr = shiftData.date.toISOString().split('T')[0];
+      if (!millProductivityByDate.has(dateStr)) {
+        millProductivityByDate.set(dateStr, { date: dateStr, values: [] });
+      }
+      const entry = millProductivityByDate.get(dateStr)!;
+      if (shiftData.millProductivityTph !== null) {
+        entry.values.push(shiftData.millProductivityTph);
+      }
+    }
+
+    const millProductivityResult = Array.from(millProductivityByDate.values()).map((d) => ({
+      date: d.date,
+      avgTph: d.values.length > 0 ? d.values.reduce((a, b) => a + b, 0) / d.values.length : 0,
+    }));
+
     // Aggregate downtime
     const downtimeByDate = new Map<
       string,
@@ -168,6 +186,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       productivity: productivityResult,
+      millProductivityTph: millProductivityResult,
       downtime: downtimeResult,
       water: waterResult,
       openHazards,

@@ -30,15 +30,28 @@ async function main() {
   if (fs.existsSync(techJournalPath)) {
     const buffer = fs.readFileSync(techJournalPath);
     const result = parseTechJournal(buffer);
+    const millProductivityByShift = new Map<string, number | null>();
+
+    for (const record of result.millProductivityTph.data) {
+      millProductivityByShift.set(
+        `${record.date}-${record.shiftNumber}`,
+        record.valueTph
+      );
+    }
 
     const upload = await prisma.upload.create({
       data: {
         type: "tech_journal",
         filename: "technical_journal.xlsx",
         status: "completed",
-        rowsParsed: result.productivity.rowsParsed + result.downtime.rowsParsed,
+        rowsParsed:
+          result.productivity.rowsParsed +
+          result.millProductivityTph.rowsParsed +
+          result.downtime.rowsParsed,
         warningsCount:
-          result.productivity.warnings.length + result.downtime.warnings.length,
+          result.productivity.warnings.length +
+          result.millProductivityTph.warnings.length +
+          result.downtime.warnings.length,
       },
     });
 
@@ -49,6 +62,7 @@ async function main() {
     for (const record of result.productivity.data) {
       const shiftKey = `${record.date}-${record.shiftNumber}`;
       let shiftId = shiftMap.get(shiftKey);
+      const millProductivityTph = millProductivityByShift.get(shiftKey);
 
       if (!shiftId) {
         const shift = await prisma.techJournalShift.upsert({
@@ -58,11 +72,15 @@ async function main() {
               shiftNumber: record.shiftNumber,
             },
           },
-          update: { sourceUploadId: upload.id },
+          update: {
+            sourceUploadId: upload.id,
+            ...(millProductivityTph !== undefined && { millProductivityTph }),
+          },
           create: {
             date: new Date(record.date),
             shiftNumber: record.shiftNumber,
             sourceUploadId: upload.id,
+            ...(millProductivityTph !== undefined && { millProductivityTph }),
           },
         });
         shiftId = shift.id;
@@ -87,6 +105,7 @@ async function main() {
     for (const record of result.downtime.data) {
       const shiftKey = `${record.date}-${record.shiftNumber}`;
       let shiftId = shiftMap.get(shiftKey);
+      const millProductivityTph = millProductivityByShift.get(shiftKey);
 
       if (!shiftId) {
         const shift = await prisma.techJournalShift.upsert({
@@ -96,11 +115,15 @@ async function main() {
               shiftNumber: record.shiftNumber,
             },
           },
-          update: { sourceUploadId: upload.id },
+          update: {
+            sourceUploadId: upload.id,
+            ...(millProductivityTph !== undefined && { millProductivityTph }),
+          },
           create: {
             date: new Date(record.date),
             shiftNumber: record.shiftNumber,
             sourceUploadId: upload.id,
+            ...(millProductivityTph !== undefined && { millProductivityTph }),
           },
         });
         shiftId = shift.id;

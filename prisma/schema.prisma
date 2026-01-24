@@ -26,6 +26,7 @@ model TechJournalShift {
   date           DateTime
   shiftNumber    Int      // 1 or 2
   sourceUploadId String?
+  millProductivityTph Float?
   productivity   TechProductivity[]
   downtime       TechDowntime[]
   createdAt      DateTime @default(now())
