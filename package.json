@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "prisma generate && next build",
+    "postinstall": "prisma generate",
     "start": "next start",
     "lint": "next lint",
     "seed": "npx tsx scripts/seed.ts",
@@ -22,6 +23,7 @@
     "@radix-ui/react-slot": "^1.1.0",
     "@radix-ui/react-tabs": "^1.1.1",
     "@radix-ui/react-toast": "^1.2.2",
+    "@vercel/blob": "^2.0.1",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "date-fns": "^4.1.0",

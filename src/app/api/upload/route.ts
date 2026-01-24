@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import path from 'path';
+import { put } from '@vercel/blob';
 import prisma from '@/lib/db';
 import { parseTechJournal } from '@/lib/parsers/tech-journal';
 import { parseWater } from '@/lib/parsers/water';
@@ -30,12 +29,17 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    // Save file to uploads directory
-    const uploadsDir = path.join(process.cwd(), 'uploads');
-    await mkdir(uploadsDir, { recursive: true });
-    const filePath = path.join(uploadsDir, `${upload.id}-${file.name}`);
+    // Save file to Vercel Blob
     const buffer = Buffer.from(await file.arrayBuffer());
-    await writeFile(filePath, buffer);
+    const blob = await put(`uploads/${upload.id}-${file.name}`, buffer, {
+      access: 'public',
+    });
+
+    // Update upload with blob URL
+    await prisma.upload.update({
+      where: { id: upload.id },
+      data: { fileUrl: blob.url },
+    });
 
     let rowsParsed = 0;
     let warningsCount = 0;
@@ -44,6 +48,56 @@ export async function POST(request: NextRequest) {
     try {
       if (fileType === 'tech_journal') {
         const result = parseTechJournal(buffer);
+
+        // Collect unique dates from the uploaded data
+        const uniqueDates = new Set<string>();
+        for (const record of result.productivity.data) {
+          uniqueDates.add(new Date(record.date).toISOString().split('T')[0]);
+        }
+        for (const record of result.downtime.data) {
+          uniqueDates.add(new Date(record.date).toISOString().split('T')[0]);
+        }
+
+        // Delete old records for overlapping dates
+        for (const dateStr of Array.from(uniqueDates)) {
+          const startOfDay = new Date(dateStr);
+          const endOfDay = new Date(dateStr);
+          endOfDay.setDate(endOfDay.getDate() + 1);
+
+          // Find shifts for this date
+          const shifts = await prisma.techJournalShift.findMany({
+            where: {
+              date: {
+                gte: startOfDay,
+                lt: endOfDay,
+              },
+            },
+            select: { id: true },
+          });
+
+          const shiftIds = shifts.map((s) => s.id);
+
+          if (shiftIds.length > 0) {
+            // Delete related hazards first
+            await prisma.hazard.deleteMany({
+              where: {
+                sourceType: 'tech_journal',
+                date: {
+                  gte: startOfDay,
+                  lt: endOfDay,
+                },
+              },
+            });
+
+            // Delete old productivity and downtime records
+            await prisma.techProductivity.deleteMany({
+              where: { techShiftId: { in: shiftIds } },
+            });
+            await prisma.techDowntime.deleteMany({
+              where: { techShiftId: { in: shiftIds } },
+            });
+          }
+        }
 
         // Store productivity data
         for (const record of result.productivity.data) {
@@ -151,6 +205,40 @@ export async function POST(request: NextRequest) {
         warningsCount = result.warnings.length;
       } else if (fileType === 'downtime') {
         const result = parseDowntime(buffer);
+
+        // Collect unique dates from the uploaded data
+        const uniqueDates = new Set<string>();
+        for (const record of result.data) {
+          uniqueDates.add(new Date(record.date).toISOString().split('T')[0]);
+        }
+
+        // Delete old records for overlapping dates
+        for (const dateStr of Array.from(uniqueDates)) {
+          const startOfDay = new Date(dateStr);
+          const endOfDay = new Date(dateStr);
+          endOfDay.setDate(endOfDay.getDate() + 1);
+
+          // Delete related hazards first
+          await prisma.hazard.deleteMany({
+            where: {
+              sourceType: 'downtime',
+              date: {
+                gte: startOfDay,
+                lt: endOfDay,
+              },
+            },
+          });
+
+          // Delete old downtime records
+          await prisma.downtimeDaily.deleteMany({
+            where: {
+              date: {
+                gte: startOfDay,
+                lt: endOfDay,
+              },
+            },
+          });
+        }
 
         for (const record of result.data) {
           const downtime = await prisma.downtimeDaily.create({
