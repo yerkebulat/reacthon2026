@@ -80,7 +80,7 @@ export default function HomePage() {
         </div>
 
         <div className="mt-12 text-center text-slate-500 text-sm">
-          <p>Hackathon 2026 Project</p>
+          <p>Reacthon 2026</p>
         </div>
       </div>
     </div>
