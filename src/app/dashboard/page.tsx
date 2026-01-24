@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowLeft, RefreshCw, Calendar } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -223,6 +224,7 @@ export default function DashboardPage() {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
+            <Image src="/logo_qazyna.png" alt="Qazyna" width={40} height={40} className="rounded" />
             <h1 className="text-2xl font-bold">Панель управления</h1>
           </div>
           <Button onClick={fetchData} disabled={loading}>

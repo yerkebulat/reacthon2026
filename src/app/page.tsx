@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { LayoutDashboard, Upload, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +11,15 @@ export default function HomePage() {
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 flex items-center justify-center p-8">
       <div className="max-w-4xl w-full">
         <div className="text-center mb-12">
+          <div className="flex justify-center mb-6">
+            <Image
+              src="/logo_qazyna.png"
+              alt="Qazyna Logo"
+              width={120}
+              height={120}
+              className="rounded-lg"
+            />
+          </div>
           <h1 className="text-5xl font-bold text-white mb-4">Qazyna</h1>
           <p className="text-xl text-slate-300">
             Аналитическая панель обогатительной фабрики

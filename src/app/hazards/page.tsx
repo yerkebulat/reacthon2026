@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   ArrowLeft,
   RefreshCw,
@@ -167,6 +168,7 @@ export default function HazardsPage() {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
+            <Image src="/logo_qazyna.png" alt="Qazyna" width={40} height={40} className="rounded" />
             <div>
               <h1 className="text-2xl font-bold">HSE Риски</h1>
               <p className="text-sm text-muted-foreground">

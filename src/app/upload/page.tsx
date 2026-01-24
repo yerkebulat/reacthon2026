@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { ArrowLeft, Upload, FileSpreadsheet, CheckCircle, XCircle, Loader2 } from "lucide-react";
 import { useDropzone } from "react-dropzone";
 import { Button } from "@/components/ui/button";
@@ -270,6 +271,7 @@ export default function UploadPage() {
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </Link>
+            <Image src="/logo_qazyna.png" alt="Qazyna" width={40} height={40} className="rounded" />
             <div>
               <h1 className="text-2xl font-bold">Загрузка данных</h1>
               <p className="text-sm text-muted-foreground">
