@@ -267,7 +267,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-8 max-w-6xl mx-auto mb-12">
           {/* Density */}
           <div className="bg-white/10 backdrop-blur rounded-2xl p-8 text-center">
-            <div className="text-6xl font-bold mb-2" style={{
+            <div className="text-[clamp(2.5rem,4vw,4rem)] font-bold mb-2 leading-none tracking-tight" style={{
               color: signals?.productivity?.signal === "green" ? "#22c55e" :
                      signals?.productivity?.signal === "yellow" ? "#f59e0b" : "#ef4444"
             }}>
@@ -279,7 +279,7 @@ export default function DashboardPage() {
 
           {/* Mill Productivity TPH */}
           <div className="bg-white/10 backdrop-blur rounded-2xl p-8 text-center">
-            <div className="text-6xl font-bold mb-2 text-emerald-400">
+            <div className="text-[clamp(2.5rem,4vw,4rem)] font-bold mb-2 leading-none tracking-tight text-emerald-400">
               {avgMillProductivityTph.toFixed(1)}
             </div>
             <div className="text-lg text-slate-300 leading-snug break-words">Производительность тн/ч</div>
@@ -288,7 +288,7 @@ export default function DashboardPage() {
 
           {/* Downtime */}
           <div className="bg-white/10 backdrop-blur rounded-2xl p-8 text-center">
-            <div className="text-6xl font-bold mb-2" style={{
+            <div className="text-[clamp(2.5rem,4vw,4rem)] font-bold mb-2 leading-none tracking-tight" style={{
               color: signals?.downtime?.signal === "green" ? "#22c55e" :
                      signals?.downtime?.signal === "yellow" ? "#f59e0b" : "#ef4444"
             }}>
@@ -300,7 +300,7 @@ export default function DashboardPage() {
 
           {/* Water */}
           <div className="bg-white/10 backdrop-blur rounded-2xl p-8 text-center">
-            <div className="text-6xl font-bold mb-2" style={{
+            <div className="text-[clamp(2.5rem,4vw,4rem)] font-bold mb-2 leading-none tracking-tight" style={{
               color: signals?.water?.signal === "green" ? "#22c55e" :
                      signals?.water?.signal === "yellow" ? "#f59e0b" : "#ef4444"
             }}>
@@ -312,7 +312,7 @@ export default function DashboardPage() {
 
           {/* HSE */}
           <div className="bg-white/10 backdrop-blur rounded-2xl p-8 text-center">
-            <div className="text-6xl font-bold mb-2" style={{
+            <div className="text-[clamp(2.5rem,4vw,4rem)] font-bold mb-2 leading-none tracking-tight" style={{
               color: (data?.openHazards || 0) === 0 ? "#22c55e" : "#ef4444"
             }}>
               {data?.openHazards || 0}
