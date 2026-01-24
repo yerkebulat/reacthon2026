@@ -329,10 +329,10 @@ export default function DashboardPage() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-2xl font-bold">{avgProductivity.toFixed(1)}%</div>
-                {signals && <SignalBadge signal={signals.productivity.signal} />}
+                {signals?.productivity && <SignalBadge signal={signals.productivity.signal} />}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                Цель: {signals?.productivity.targetPct || 65}%
+                Цель: {signals?.productivity?.targetPct || 65}%
               </p>
             </CardContent>
           </Card>
@@ -346,7 +346,7 @@ export default function DashboardPage() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div className="text-2xl font-bold">{totalDowntime} мин</div>
-                {signals && <SignalBadge signal={signals.downtime.signal} />}
+                {signals?.downtime && <SignalBadge signal={signals.downtime.signal} />}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 За выбранный период
@@ -365,7 +365,7 @@ export default function DashboardPage() {
                 <div className="text-2xl font-bold">
                   {waterOverNominal > 0 ? "+" : ""}{waterOverNominal.toFixed(1)}%
                 </div>
-                {signals && <SignalBadge signal={signals.water.signal} />}
+                {signals?.water && <SignalBadge signal={signals.water.signal} />}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 Отклонение от нормы
