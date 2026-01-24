@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Upload {
+  id            String   @id @default(cuid())
+  type          String   // "tech_journal" | "water" | "downtime"
+  filename      String
+  uploadedAt    DateTime @default(now())
+  status        String   @default("pending") // pending | processing | completed | failed
+  rowsParsed    Int      @default(0)
+  warningsCount Int      @default(0)
+  errorMessage  String?
+}
+
+model TechJournalShift {
+  id             String   @id @default(cuid())
+  date           DateTime
+  shiftNumber    Int      // 1 or 2
+  sourceUploadId String?
+  productivity   TechProductivity[]
+  downtime       TechDowntime[]
+  createdAt      DateTime @default(now())
+  @@unique([date, shiftNumber])
+}
+
+model TechProductivity {
+  id          String   @id @default(cuid())
+  techShiftId String
+  techShift   TechJournalShift @relation(fields: [techShiftId], references: [id], onDelete: Cascade)
+  hour        Int      // 0-23
+  millLine    Int      // 1-5
+  valuePct    Float?   // density percentage (nullable for #DIV/0! etc)
+}
+
+model TechDowntime {
+  id          String   @id @default(cuid())
+  techShiftId String
+  techShift   TechJournalShift @relation(fields: [techShiftId], references: [id], onDelete: Cascade)
+  equipment   String   // "№1", "№2", etc
+  timeFrom    String?  // time string "HH:MM"
+  timeTo      String?
+  minutes     Float?
+  reasonText  String?
+}
+
+model WaterDaily {
+  id             String   @id @default(cuid())
+  date           DateTime @unique
+  meterReading   Float?
+  actualDaily    Float?
+  actualHourly   Float?
+  nominalDaily   Float?   // target consumption
+  monthLabel     String?  // "Март 2025г"
+  sourceUploadId String?
+}
+
+model DowntimeDaily {
+  id             String   @id @default(cuid())
+  date           DateTime
+  equipment      String   // МШР №1, МШЦ №2, etc
+  reasonText     String?
+  minutes        Float?
+  classification String?  // M | E | T | P | null
+  sourceUploadId String?
+  @@index([date])
+}
+
+model Hazard {
+  id          String   @id @default(cuid())
+  date        DateTime
+  sourceType  String   // "tech_journal" | "downtime" | "manual"
+  sourceRefId String?
+  description String
+  severity    String   // "low" | "medium" | "high"
+  status      String   @default("open") // "open" | "closed"
+  tags        String?  // comma-separated
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

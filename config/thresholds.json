@@ -1,0 +1,25 @@
+{
+  "productivity": {
+    "targetPct": 65,
+    "yellowThresholdPct": 5,
+    "redThresholdPct": 10
+  },
+  "downtime": {
+    "greenMaxMinutes": 60,
+    "yellowMaxMinutes": 120
+  },
+  "water": {
+    "yellowOverPct": 5,
+    "redOverPct": 15
+  },
+  "priority": {
+    "downtimeWeight": 1,
+    "waterOverWeight": 50,
+    "productivityDropWeight": 100
+  },
+  "hazardKeywords": {
+    "high": ["травм", "взрыв", "пожар", "газ", "авар"],
+    "medium": ["утеч", "задым", "наруш", "инцидент"],
+    "low": ["безопас", "СИЗ", "паден", "ожог"]
+  }
+}
