@@ -291,7 +291,7 @@ export default function DashboardPage() {
               color: signals?.downtime?.signal === "green" ? "#22c55e" :
                      signals?.downtime?.signal === "yellow" ? "#f59e0b" : "#ef4444"
             }}>
-              {totalDowntime}
+              {totalDowntime.toFixed(2)}
             </div>
             <div className="text-xl text-slate-300">Простой (мин)</div>
             <div className="text-sm text-slate-400 mt-2">За период</div>
@@ -559,7 +559,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between">
-                <div className="text-2xl font-bold">{totalDowntime} мин</div>
+                <div className="text-2xl font-bold">{totalDowntime.toFixed(2)} мин</div>
                 {signals?.downtime && <SignalBadge signal={signals.downtime.signal} />}
               </div>
               <p className="text-xs text-muted-foreground mt-1">
